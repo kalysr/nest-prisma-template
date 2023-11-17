@@ -1,0 +1,89 @@
+variables:
+  POSTGRES_PASSWORD: secret
+  POSTGRES_USER: master
+  POSTGRES_DB: testing
+
+e2e_tests:
+  stage: test
+  services:
+    - postgres:14.5
+  image: node:16.18.1-alpine
+  interruptible: true
+  allow_failure: false
+  script:
+    - apk add git
+    - npm install
+    - export $(cat docker/testing/.e2e.env | xargs)
+    - export POSTGRES_DBNAME=$POSTGRES_DB
+    - export POSTGRES_PASS=$POSTGRES_PASSWORD
+    - export POSTGRES_HOST=postgres
+    - export POSTGRES_PORT=5432
+    - export DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASS@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DBNAME
+    - npx prisma generate
+    - npx prisma migrate deploy
+    - npm run test:e2e:ci
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $DEV_BRANCH'
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "preprod"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - when: always
+
+unit_tests:
+  stage: test
+  services:
+    - postgres:14.5
+  image: node:16.18.1-alpine
+  interruptible: true
+  allow_failure: false
+  script:
+    - apk add git
+    - npm install
+    - export $(cat docker/testing/.e2e.env | xargs)
+    - export POSTGRES_DBNAME=$POSTGRES_DB
+    - export POSTGRES_PASS=$POSTGRES_PASSWORD
+    - export POSTGRES_HOST=postgres
+    - export POSTGRES_PORT=5432
+    - export DATABASE_URL=postgresql://$POSTGRES_USER:$POSTGRES_PASS@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DBNAME
+    - npx prisma generate
+    - npx prisma migrate deploy
+    - npm run test:ci
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $DEV_BRANCH'
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "preprod"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - when: always
+
+audit:
+  image: node:16.18.1-alpine
+  script:
+    - npm audit
+  allow_failure: true
+  except:
+    - stage
+    - preprod
+    - master
+
+eslint:
+  image: node:16.18.1-alpine
+  script:
+    - npm install eslint
+    - npm run lint:ci
+  allow_failure: true
+  except:
+    - stage
+    - preprod
+    - master

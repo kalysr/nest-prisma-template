@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+echo "Start testing!"
+
+cleanup() {
+  echo "Cleaning up"
+  docker-compose -f ./docker/testing/docker-compose.testing.yml down -t 0
+  exit 0
+}
+
+trap cleanup INT
+
+export $(cat ./docker/testing/.e2e.env | xargs)
+DATABASE_URL="postgresql://master:secret@localhost:5432/testing"
+
+docker-compose -f ./docker/testing/docker-compose.testing.yml up -d testing-database
+
+sleep 5
+
+npx prisma generate
+
+npx prisma migrate deploy
+
+npm run test:ci -- --testPathPattern=$1
+
+cleanup
+
+echo "End testing"
